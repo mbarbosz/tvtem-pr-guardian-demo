@@ -1,0 +1,89 @@
+name: pr-security
+
+on:
+  pull_request:
+  workflow_dispatch: # o agente do Gemini Enterprise redispara aqui (ref = branch do PR)
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pr-security:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - run: pip install pip-audit bandit
+
+      - name: dependency-review
+        id: depreview
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: low
+
+      - name: registry (PyPI + OSV)
+        id: registry
+        continue-on-error: true
+        run: python scripts/check_registry.py 2>&1 | tee registry.txt; exit ${PIPESTATUS[0]}
+
+      - name: pip-audit
+        id: pipaudit
+        continue-on-error: true
+        run: pip-audit -r requirements.txt --no-deps --disable-pip --desc 2>&1 | tee pipaudit.txt; exit ${PIPESTATUS[0]}
+
+      - name: bandit (SAST)
+        id: bandit
+        continue-on-error: true
+        run: bandit -r app -f txt 2>&1 | tee bandit.txt; exit ${PIPESTATUS[0]}
+
+      - name: gitleaks (segredos)
+        id: gitleaks
+        continue-on-error: true
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.24.3 dir /repo/app --no-banner -v 2>&1 | tee gitleaks.txt; exit ${PIPESTATUS[0]}
+
+      - name: testes
+        id: tests
+        continue-on-error: true
+        run: (pip install -r requirements.txt && pytest -q) 2>&1 | tee tests.txt; exit ${PIPESTATUS[0]}
+
+      - name: relatório consolidado
+        if: always()
+        run: |
+          row() { [ "$2" = "success" ] && echo "| $1 | ✅ ok |" || { [ "$2" = "skipped" ] && echo "| $1 | ⏭️ n/a |" || echo "| $1 | ❌ FALHOU |"; }; }
+          sec() { [ -s "$2" ] && printf '<details><summary>%s</summary>\n\n```\n%s\n```\n</details>\n\n' "$1" "$(tail -c 15000 "$2")"; }
+          {
+            echo "## 🛡️ Relatório determinístico (pr-security)"
+            echo "Commit: \`${GITHUB_SHA::7}\` · Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            echo "| Checagem | Resultado |"
+            echo "|---|---|"
+            row "Dependency Review (GitHub Advisory DB)" "${{ steps.depreview.outcome }}"
+            row "Registro PyPI + OSV.dev (fora do ar / yanked / malicioso / CVE)" "${{ steps.registry.outcome }}"
+            row "pip-audit (PyPA Advisory DB)" "${{ steps.pipaudit.outcome }}"
+            row "Bandit (SAST Python)" "${{ steps.bandit.outcome }}"
+            row "Gitleaks (segredos)" "${{ steps.gitleaks.outcome }}"
+            row "Testes (pytest)" "${{ steps.tests.outcome }}"
+            echo
+            sec "Registro PyPI + OSV" registry.txt
+            sec "pip-audit" pipaudit.txt
+            sec "Bandit" bandit.txt
+            sec "Gitleaks" gitleaks.txt
+            sec "Testes" tests.txt
+          } > report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          PR="${{ github.event.pull_request.number }}"
+          [ -z "$PR" ] && PR=$(gh pr list --head "$GITHUB_REF_NAME" --json number -q '.[0].number')
+          [ -n "$PR" ] && { gh pr comment "$PR" --body-file report.md --edit-last 2>/dev/null || gh pr comment "$PR" --body-file report.md; }
+          ! grep -q "❌" report.md
