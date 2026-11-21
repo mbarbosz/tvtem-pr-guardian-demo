@@ -40,18 +40,18 @@ jobs:
       - name: pip-audit
         id: pipaudit
         continue-on-error: true
-        run: pip-audit -r requirements.txt --no-deps --disable-pip --desc 2>&1 | tee pipaudit.txt; exit ${PIPESTATUS[0]}
+        run: pip-audit -r requirements.txt --no-deps --disable-pip 2>&1 | tee pipaudit.txt; exit ${PIPESTATUS[0]}
 
       - name: bandit (SAST)
         id: bandit
         continue-on-error: true
-        run: bandit -r app -f txt 2>&1 | tee bandit.txt; exit ${PIPESTATUS[0]}
+        run: bandit -r app -q -f custom --msg-template '{relpath}:{line} [{test_id}] {severity} {msg}' 2>&1 | sed -E "s/(password: )'[^']+'/\\1'***'/" | tee bandit.txt; exit ${PIPESTATUS[0]}
 
       - name: gitleaks (segredos)
         id: gitleaks
         continue-on-error: true
         run: |
-          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.24.3 dir /repo/app --no-banner -v 2>&1 | tee gitleaks.txt; exit ${PIPESTATUS[0]}
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.24.3 dir /repo/app --no-banner --redact -v 2>&1 | tee gitleaks.txt; exit ${PIPESTATUS[0]}
 
       - name: testes
         id: tests
