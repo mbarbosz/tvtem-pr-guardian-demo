@@ -45,7 +45,8 @@ jobs:
       - name: bandit (SAST)
         id: bandit
         continue-on-error: true
-        run: bandit -r app -q -f custom --msg-template '{relpath}:{line} [{test_id}] {severity} {msg}' 2>&1 | sed -E "s/(password: )'[^']+'/\\1'***'/" | tee bandit.txt; exit ${PIPESTATUS[0]}
+        run: |
+          bandit -r app -q -f custom --msg-template '{relpath}:{line} [{test_id}] {severity} {msg}' 2>&1 | sed -E "s/(password: )'[^']+'/\\1'***'/" | tee bandit.txt; exit ${PIPESTATUS[0]}
 
       - name: gitleaks (segredos)
         id: gitleaks
