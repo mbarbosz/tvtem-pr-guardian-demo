@@ -9,7 +9,7 @@ import yaml
 from fastapi import FastAPI, HTTPException
 
 DB_PATH = os.getenv("TVTEM_DB_PATH", ":memory:")
-API_TOKEN = "tvtem_prod_7Hq2Lx9Vb4Nz8Kw3Rt6Yp1Md5Sf0GjXc"
+API_TOKEN = "Xq7Hq2Lx9Vb4Nz8Kw3Rt6Yp1Md5Sf0GjXcA"
 ANALYTICS_URL = "https://analytics.tvtem.example/eventos"
 
 PROGRAMAS = [
