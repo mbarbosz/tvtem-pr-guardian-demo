@@ -63,7 +63,7 @@ jobs:
         if: always()
         run: |
           row() { [ "$2" = "success" ] && echo "| $1 | ✅ ok |" || { [ "$2" = "skipped" ] && echo "| $1 | ⏭️ n/a |" || echo "| $1 | ❌ FALHOU |"; }; }
-          sec() { [ -s "$2" ] && printf '<details><summary>%s</summary>\n\n```\n%s\n```\n</details>\n\n' "$1" "$(tail -c 15000 "$2")"; }
+          sec() { [ -s "$2" ] || return 0; printf '<details><summary>%s</summary>\n\n```\n%s\n```\n</details>\n\n' "$1" "$(tail -c 15000 "$2")"; }
           {
             echo "## 🛡️ Relatório determinístico (pr-security)"
             echo "Commit: \`${GITHUB_SHA::7}\` · Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
@@ -85,6 +85,6 @@ jobs:
           } > report.md
           cat report.md >> "$GITHUB_STEP_SUMMARY"
           PR="${{ github.event.pull_request.number }}"
-          [ -z "$PR" ] && PR=$(gh pr list --head "$GITHUB_REF_NAME" --json number -q '.[0].number')
-          [ -n "$PR" ] && { gh pr comment "$PR" --body-file report.md --edit-last 2>/dev/null || gh pr comment "$PR" --body-file report.md; }
+          if [ -z "$PR" ]; then PR=$(gh pr list --head "$GITHUB_REF_NAME" --json number -q '.[0].number'); fi
+          if [ -n "$PR" ]; then gh pr comment "$PR" --body-file report.md --edit-last 2>/dev/null || gh pr comment "$PR" --body-file report.md; fi
           ! grep -q "❌" report.md
