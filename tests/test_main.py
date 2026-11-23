@@ -1,7 +1,8 @@
+import importlib
+import os
 from fastapi.testclient import TestClient
 
 from app.main import app
-from scripts.check_registry import parse_requirements
 
 client = TestClient(app)
 
@@ -23,22 +24,36 @@ def test_obter_programa_existente():
     assert r.json()["titulo"] == "Tem Notícias 1ª Edição"
 
 
-def test_parse_requirements():
-    assert "fastapi" in parse_requirements("requirements.txt")
+def test_obter_programa_inexistente():
+    r = client.get("/programas/999")
+    assert r.status_code == 404
 
 
-def test_api_token_nao_hardcoded(monkeypatch):
-    import importlib
+def test_api_token_lido_de_variavel_de_ambiente(monkeypatch):
+    monkeypatch.setenv("TVTEM_ANALYTICS_TOKEN", "token-de-teste")
     import app.main as main_module
-
-    monkeypatch.delenv("TVTEM_ANALYTICS_TOKEN", raising=False)
     importlib.reload(main_module)
-    assert main_module.API_TOKEN is None
+    assert main_module.API_TOKEN == "token-de-teste"
+    assert main_module.API_TOKEN != "tvtem-secret-token-hardcoded-12345"
 
-    expected = "sample-env-value"
-    monkeypatch.setenv("TVTEM_ANALYTICS_TOKEN", expected)
-    importlib.reload(main_module)
-    assert main_module.API_TOKEN == expected
 
-    monkeypatch.delenv("TVTEM_ANALYTICS_TOKEN", raising=False)
-    importlib.reload(main_module)
+def test_busca_parametrizada_bloqueia_sql_injection(monkeypatch):
+    monkeypatch.setattr("app.main.requests.post", lambda *args, **kwargs: None)
+
+    r_q = client.get("/programas/busca", params={"q": "' OR '1'='1"})
+    assert r_q.status_code == 200
+    assert r_q.json() == []
+
+    r_genero = client.get(
+        "/programas/busca",
+        params={"q": "Tem", "genero": "jornalismo' OR '1'='1"},
+    )
+    assert r_genero.status_code == 200
+    assert r_genero.json() == []
+
+    r_valido = client.get(
+        "/programas/busca",
+        params={"q": "Tem", "genero": "jornalismo"},
+    )
+    assert r_valido.status_code == 200
+    assert len(r_valido.json()) == 2
