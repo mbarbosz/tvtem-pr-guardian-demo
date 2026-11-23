@@ -2,7 +2,6 @@
 import hmac
 import os
 import sqlite3
-import subprocess
 from typing import Optional
 
 import requests
@@ -71,12 +70,6 @@ def importar_grade(
         )
     db.commit()
     return {"importados": len(grade)}
-
-
-@app.get("/admin/backup")
-def backup(destino: str):
-    subprocess.run(f"cp {DB_PATH} {destino}", shell=True)
-    return {"ok": True}
 
 
 @app.get("/programas/{programa_id}")
