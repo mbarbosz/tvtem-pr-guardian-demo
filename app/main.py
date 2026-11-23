@@ -35,11 +35,14 @@ def listar_programas():
 
 @app.get("/programas/busca")
 def buscar_programas(q: str, genero: str = ""):
-    sql = f"SELECT * FROM programas WHERE titulo LIKE '%{q}%'"
     if genero:
-        sql += f" AND genero = '{genero}'"
+        sql = "SELECT * FROM programas WHERE titulo LIKE ? AND genero = ?"
+        params = (f"%{q}%", genero)
+    else:
+        sql = "SELECT * FROM programas WHERE titulo LIKE ?"
+        params = (f"%{q}%",)
     requests.post(ANALYTICS_URL, json={"busca": q}, headers={"Authorization": API_TOKEN}, verify=False, timeout=2)
-    return [dict(r) for r in db.execute(sql)]
+    return [dict(r) for r in db.execute(sql, params)]
 
 
 @app.post("/programas/importar")
