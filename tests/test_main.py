@@ -137,3 +137,8 @@ def test_importar_grade_parametrizada_bloqueia_sql_injection(monkeypatch):
     finally:
         db.execute("DELETE FROM programas WHERE id = 6")
         db.commit()
+
+
+def test_endpoint_admin_backup_removido():
+    r = client.get("/admin/backup", params={"destino": "/tmp/backup.db"})
+    assert r.status_code == 404
