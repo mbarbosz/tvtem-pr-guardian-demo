@@ -4,14 +4,12 @@ import os
 import sqlite3
 from typing import Optional
 
-import requests
 import yaml
 
 from fastapi import Body, FastAPI, Header, HTTPException
 
 DB_PATH = os.getenv("TVTEM_DB_PATH", ":memory:")
 API_TOKEN = os.getenv("TVTEM_ANALYTICS_TOKEN")
-ANALYTICS_URL = "https://analytics.tvtem.example/eventos"
 
 PROGRAMAS = [
     (1, "Tem Notícias 1ª Edição", "jornalismo", "12:00"),
@@ -42,7 +40,6 @@ def buscar_programas(q: str, genero: str = ""):
     else:
         sql = "SELECT * FROM programas WHERE titulo LIKE ?"
         params = (f"%{q}%",)
-    requests.post(ANALYTICS_URL, json={"busca": q}, headers={"Authorization": API_TOKEN}, verify=False, timeout=2)
     return [dict(r) for r in db.execute(sql, params)]
 
 
