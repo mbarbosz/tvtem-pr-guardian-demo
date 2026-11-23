@@ -106,3 +106,34 @@ def test_importar_grade_bloqueia_yaml_inseguro_e_aceita_yaml_valido(monkeypatch)
     finally:
         db.execute("DELETE FROM programas WHERE id = 5")
         db.commit()
+
+
+def test_importar_grade_parametrizada_bloqueia_sql_injection(monkeypatch):
+    monkeypatch.setenv("TVTEM_ADMIN_TOKEN", "admin-token-secreto")
+    headers = {"Content-Type": "text/plain", "X-Admin-Token": "admin-token-secreto"}
+    payload_sqli = (
+        "- id: 6\n"
+        "  titulo: \"Teste'); DROP TABLE programas; --\"\n"
+        "  genero: \"jornalismo' OR '1'='1\"\n"
+        "  horario: \"10:00\"\n"
+    )
+    try:
+        r = client.post(
+            "/programas/importar",
+            content=payload_sqli,
+            headers=headers,
+        )
+        assert r.status_code == 200
+        assert r.json() == {"importados": 1}
+
+        r_prog = client.get("/programas/6")
+        assert r_prog.status_code == 200
+        assert r_prog.json()["titulo"] == "Teste'); DROP TABLE programas; --"
+        assert r_prog.json()["genero"] == "jornalismo' OR '1'='1"
+
+        r_lista = client.get("/programas")
+        assert r_lista.status_code == 200
+        assert len(r_lista.json()) == 5
+    finally:
+        db.execute("DELETE FROM programas WHERE id = 6")
+        db.commit()
