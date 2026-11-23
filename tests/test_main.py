@@ -128,3 +128,9 @@ def test_importar_grade_nao_reutiliza_token_analytics(monkeypatch):
     )
     assert r.status_code == 401
     assert not hmac.compare_digest("token-analytics-apenas", "token-admin-exclusivo")
+
+
+def test_requirements_nao_contem_requests_vulneravel():
+    reqs = (Path(__file__).resolve().parent.parent / "requirements.txt").read_text(encoding="utf-8").splitlines()
+    pacotes = [line.strip().split("==")[0].split(">=")[0].lower() for line in reqs if line.strip() and not line.strip().startswith("#")]
+    assert "requests" not in pacotes
