@@ -142,3 +142,16 @@ def test_importar_grade_parametrizada_bloqueia_sql_injection(monkeypatch):
 def test_endpoint_admin_backup_removido():
     r = client.get("/admin/backup", params={"destino": "/tmp/backup.db"})
     assert r.status_code == 404
+
+
+def test_pyyaml_versao_segura_em_requirements():
+    from pathlib import Path
+    import re
+
+    req_path = Path(__file__).resolve().parent.parent / "requirements.txt"
+    conteudo = req_path.read_text(encoding="utf-8")
+    assert "PyYAML==5.3.1" not in conteudo
+    match = re.search(r"(?im)^pyyaml\s*(==|>=)\s*(\d+)\.(\d+)(?:\.(\d+))?", conteudo)
+    assert match is not None, "PyYAML deve estar declarado em requirements.txt"
+    major, minor = int(match.group(2)), int(match.group(3))
+    assert (major, minor) >= (5, 4), f"Versão vulnerável de PyYAML encontrada: {match.group(0)}"
